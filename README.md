@@ -24,8 +24,6 @@ Le dataset CNN/Daily Mail est une collection de grande envergure conçue pour la
 
 - **Dataset sur Kaggle** : Accédez aux données et au code sur [Kaggle](https://www.kaggle.com/datasets/gowrishankarp/newspaper-text-summarization-cnn-dailymail).
 
-- **Document original** : Pour plus d'informations sur sa conception et son utilisation, consultez le document de Nallapati et al. &#8203;``【oaicite:1】``&#8203;&#8203;``【oaicite:0】``&#8203;.
-
 - ** → D'autres corpus existent dans d'autres langues, lesquels ?**
     Gigaword en français
 
