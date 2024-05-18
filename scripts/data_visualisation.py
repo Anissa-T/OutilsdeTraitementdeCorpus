@@ -1,8 +1,8 @@
 """
-Module d'analyse textuelle et de visualisation des données d'articles.
+Module d'analyse et de visualisation des données textuelles.
 
-Ce module effectue diverses analyses textuelles et visualisations sur des articles et leurs descriptions.
-Il inclut des fonctions pour charger les données, compter les tokens, catégoriser les différences de tokens,
+Ce module effectue diverses analyses et visualisations sur des articles et leurs descriptions.
+Il inclut des fonctions pour compter les tokens, catégoriser les différences de tokens, 
 extraire les termes fréquents, et comparer les similarités cosines.
 """
 
@@ -13,8 +13,9 @@ import nltk
 from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 from nltk.corpus import stopwords
+from sklearn.metrics import precision_score, recall_score, f1_score
 
-# Télécharger manuellement les stop words français
+# Télécharger les stop words français
 import ssl
 try:
     _create_unverified_https_context = ssl._create_unverified_context
@@ -26,8 +27,7 @@ else:
 nltk.download('stopwords')
 
 # Charger les données JSON
-with open('../data/clean/donnees_scrapees.json', 'r', encoding='utf-8') as f:
-    data = pd.read_json(f)
+data = pd.read_json('../data/clean/donnees_scrapees.json')
 
 def count_tokens(text):
     """
@@ -44,6 +44,13 @@ def count_tokens(text):
 # Ajouter des colonnes pour le nombre de tokens dans l'article et la description
 data['article_tokens'] = data['article'].apply(count_tokens)
 data['description_tokens'] = data['description'].apply(count_tokens)
+
+# Ajouter des colonnes pour la taille des textes
+data['article_length'] = data['article'].str.len()
+data['description_length'] = data['description'].str.len()
+
+# Calculer le ratio de compression
+data['compression_ratio'] = data['description_length'] / data['article_length']
 
 # Calculer la différence de tokens
 data['token_difference'] = data['article_tokens'] - data['description_tokens']
@@ -67,11 +74,10 @@ def categorize_difference(diff):
 
 data['category'] = data['token_difference'].apply(categorize_difference)
 
-# Créer l'histogramme coloré avec annotations
+# Distribution des articles par différence de tokens
 plt.figure(figsize=(10, 6))
 ax = sns.histplot(data=data, x='category', hue='category', palette={'Grande différence': 'red', 'Similaire': 'green', 'Grande description': 'blue'}, edgecolor='black', legend=False)
 
-# Ajouter des annotations
 for p in ax.patches:
     ax.annotate(f'{p.get_height()}', (p.get_x() + p.get_width() / 2., p.get_height()), ha='center', va='baseline')
 
@@ -80,17 +86,15 @@ plt.xlabel('Catégorie')
 plt.ylabel('Nombre d\'articles')
 plt.show()
 
-# Calculer les moyennes des tokens pour les articles et les descriptions
+# Comparaison des moyennes de tokens entre articles et descriptions
 mean_article_tokens = data['article_tokens'].mean()
 mean_description_tokens = data['description_tokens'].mean()
 
-# Créer un graphique en barres pour comparer les moyennes
 plt.figure(figsize=(8, 6))
 categories = ['Articles', 'Descriptions']
 means = [mean_article_tokens, mean_description_tokens]
 sns.barplot(x=categories, y=means, palette=['blue', 'orange'], legend=False)
 
-# Ajouter des annotations pour les valeurs moyennes
 for i, mean in enumerate(means):
     plt.text(i, mean + 10, f'{mean:.1f}', ha='center', va='bottom')
 
@@ -161,16 +165,14 @@ df_top_words = pd.DataFrame({
     'Description_Freq': [freq for word, freq in top_words_description_filtered]
 })
 
-# Créer un graphique en barres pour comparer les termes clés
+# Comparaison des termes clés
 plt.figure(figsize=(14, 8))
 
-# Articles
 plt.subplot(1, 2, 1)
 sns.barplot(x='Article_Freq', y='Article', data=df_top_words, palette='Blues_d', hue='Article', dodge=False, legend=False)
 plt.title('Top termes dans les articles')
 plt.xlabel('Fréquence')
 
-# Descriptions
 plt.subplot(1, 2, 2)
 sns.barplot(x='Description_Freq', y='Description', data=df_top_words, palette='Oranges_d', hue='Description', dodge=False, legend=False)
 plt.title('Top termes dans les descriptions')
@@ -179,7 +181,7 @@ plt.xlabel('Fréquence')
 plt.tight_layout()
 plt.show()
 
-# Niveau de réduction : Scatter Plot des longueurs des articles par rapport aux descriptions
+# Relation entre les longueurs des articles et des descriptions
 plt.figure(figsize=(8, 6))
 plt.scatter(data['article_tokens'], data['description_tokens'], alpha=0.5)
 plt.xlabel('Nombre de tokens des articles')
@@ -187,8 +189,7 @@ plt.ylabel('Nombre de tokens des descriptions')
 plt.title('Relation entre les longueurs des articles et des descriptions')
 plt.show()
 
-# Comparaison de Similarité
-# Scatter Plot de Similarité Cosine
+# Comparaison de Similarité Cosine
 vectorizer = TfidfVectorizer().fit_transform(data['article'].tolist() + data['description'].tolist())
 vectors = vectorizer[:len(data)], vectorizer[len(data):]
 cosine_similarities = cosine_similarity(vectors[0], vectors[1])
@@ -203,3 +204,77 @@ plt.show()
 
 # Ajouter les similarités cosines au DataFrame
 data['cosine_similarity'] = cosine_similarities_diag
+
+# Scatter Plot des similarités cosines par rapport aux différences de tokens
+plt.figure(figsize=(8, 6))
+plt.scatter(data['token_difference'], data['cosine_similarity'], alpha=0.5)
+plt.xlabel('Différence de tokens')
+plt.ylabel('Similarité Cosine')
+plt.title('Similarité Cosine vs Différence de Tokens')
+plt.show()
+
+# Heatmap de corrélation
+plt.figure(figsize=(10, 8))
+corr_matrix = data[['article_tokens', 'description_tokens', 'token_difference', 'cosine_similarity', 'article_length', 'description_length', 'compression_ratio']].corr()
+sns.heatmap(corr_matrix, annot=True, cmap='coolwarm', vmin=-1, vmax=1)
+plt.title('Heatmap des corrélations')
+plt.show()
+
+# Sauvegarder le DataFrame avec les nouvelles colonnes
+data.to_csv('../data/clean/donnees_analysees.csv', index=False)
+
+def get_word_frequencies(corpus):
+    """
+    Calculer les fréquences des mots dans un corpus.
+
+    Args:
+        corpus (list): Liste de textes à analyser.
+
+    Returns:
+        dict: Dictionnaire des fréquences des mots.
+    """
+    vec = CountVectorizer().fit(corpus)
+    bag_of_words = vec.transform(corpus)
+    sum_words = bag_of_words.sum(axis=0)
+    words_freq = {word: sum_words[0, idx] for word, idx in vec.vocabulary_.items()}
+    words_freq = sorted(words_freq.items(), key=lambda x: x[1], reverse=True)
+    return words_freq
+
+# Calculer les fréquences des mots dans les articles
+word_frequencies_article = get_word_frequencies(data['article'])
+
+# Calculer le rang de chaque mot
+ranks = {word: i for i, (word, _) in enumerate(word_frequencies_article, 1)}
+
+# Tracer la loi de Zipf
+plt.figure(figsize=(10, 6))
+plt.loglog(
+    list(ranks.values()),
+    [freq for word, freq in word_frequencies_article if word in ranks],
+    alpha=.5,
+)
+plt.title('Loi de Zipf')
+plt.xlabel('Rang du mot')
+plt.ylabel('Fréquence du mot')
+plt.show()
+
+# Définir le seuil de similarité cosine
+threshold = 0.5
+
+# Créer une liste de prédictions binaires (1 si la similarité cosine est supérieure au seuil, 0 sinon)
+predictions = [1 if cosine_similarity > threshold else 0 for cosine_similarity in data['cosine_similarity']]
+
+# Créer une liste de valeurs binaires réelles (1 si la catégorie est 'Similaire', 0 sinon)
+real_values = [1 if category == 'Similaire' else 0 for category in data['category']]
+
+# Calculer la précision
+precision = precision_score(real_values, predictions)
+print(f'Précision : {precision:.2f}')
+
+# Calculer le rappel
+recall = recall_score(real_values, predictions)
+print(f'Rappel : {recall:.2f}')
+
+# Calculer la F-mesure
+f1 = f1_score(real_values, predictions)
+print(f'F-mesure : {f1:.2f}')

@@ -43,3 +43,28 @@ train_df = dataset['train'].to_pandas()
 
 # Afficher les premières lignes du jeu de données de référence
 print(train_df.head())
+
+
+def load_articles_data(filepath):
+    """
+    Load articles data from a CSV file.
+    
+    Parameters:
+    filepath (str): Path to the CSV file containing articles data.
+    
+    Returns:
+    DataFrame: Loaded articles data.
+    """
+    return pd.read_csv(filepath)
+
+def load_descriptions_data(filepath):
+    """
+    Load descriptions data from a CSV file.
+    
+    Parameters:
+    filepath (str): Path to the CSV file containing descriptions data.
+    
+    Returns:
+    DataFrame: Loaded descriptions data.
+    """
+    return pd.read_csv(filepath)
